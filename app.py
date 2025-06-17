@@ -167,9 +167,8 @@ if st.button("Generate Leads"):
             query += " site:linkedin.com/in/"
         leads = get_leads_from_serpapi(query)
         df = pd.DataFrame(leads)
-        st.markdown("### 🔗 Raw Extracted Leads with Clickable LinkedIn Links")
-        df["LinkedIn Markdown"] = df["LinkedIn URL"].apply(lambda x: f"[{x}]({x})")
-        st.markdown(df[["Company", "LinkedIn Markdown", "Email"]].to_markdown(index=False), unsafe_allow_html=True)
+        st.write("Raw Extracted Leads:", df)
+
 
         if not df.empty:
             df["Verified"] = df["Email"].apply(lambda x: "✅" if x and "@" in x else "")
