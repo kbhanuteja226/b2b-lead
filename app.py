@@ -162,16 +162,5 @@ if st.button("Generate Leads"):
                     unsafe_allow_html=True
                 )
             
-
-            # Excel export
-            buffer = io.BytesIO()
-            with ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                display_df.to_excel(writer, index=False, sheet_name="Leads")
-            st.download_button(
-                label="📥 Download as Excel",
-                data=buffer.getvalue(),
-                file_name="b2b_leads.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
         else:
             st.warning("❌ No leads found. Try modifying your prompt.")
