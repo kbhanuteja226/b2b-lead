@@ -20,25 +20,18 @@ def extract_phone_from_text(text):
 def fetch_emails_and_phone_from_url(url):
     if "linkedin.com" in url:
         return ("", "")
-
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0'
     }
     try:
         response = requests.get(url, timeout=5, headers=headers)
         response.raise_for_status()
-
         content_type = response.headers.get('Content-Type', '')
         if 'text/html' not in content_type:
             return ("", "")
-
         text = response.text
         return (extract_email_from_text(text), extract_phone_from_text(text))
-    except requests.exceptions.Timeout:
-        return ("", "")
-    except requests.exceptions.RequestException as e:
-        return ("", "")
-    except Exception as e:
+    except:
         return ("", "")
 
 def extract_name(title):
@@ -46,11 +39,9 @@ def extract_name(title):
         return ""
     name_match = re.search(r"([A-Z][a-z]+(?:\s[A-Z][a-z]+){1,2})", title)
     if name_match:
-        common_roles_to_exclude = ["Manager", "Director", "Engineer", "Head", "Consultant", "Specialist"]
         potential_name = name_match.group(1)
-        if not any(role in potential_name for role in common_roles_to_exclude):
+        if not any(role in potential_name for role in ["Manager", "Director", "Engineer", "Head", "Consultant", "Specialist"]):
             return potential_name.strip()
-
     parts = title.split(" at ")[0].split()
     name_parts = [w for w in parts if w.istitle() and len(w) > 2 and w.lower() not in ["manager", "engineer", "head", "director", "consultant"]]
     return " ".join(name_parts[:2]) if name_parts else ""
@@ -77,7 +68,6 @@ def clean_company(text):
     company_match = re.search(r"at\s+([^\-]+(?:Pvt|Private|Solutions|Technologies|Services|Inc|Ltd|LLP|Consulting|Systems|Enterprises|Group)\b.*)", text, re.I)
     if company_match:
         return company_match.group(1).strip()
-
     company_keywords_regex = [
         r"\b(?:Pvt|Private)\b", r"\bSolutions\b", r"\bTechnologies\b", r"\bServices\b",
         r"\bInc(?:orporated)?\b", r"\bLtd(?:d)?\b", r"\bLLP\b", r"\bConsulting\b",
@@ -107,10 +97,8 @@ def guess_email(name, domain):
     name_parts = name.lower().split()
     if not name_parts:
         return ""
-
     first_name = name_parts[0]
     last_name = name_parts[-1] if len(name_parts) > 1 else ""
-
     patterns = []
     if first_name and last_name:
         patterns.append(f"{first_name}.{last_name}@{domain}")
@@ -118,14 +106,12 @@ def guess_email(name, domain):
         patterns.append(f"{first_name}{last_name}@{domain}")
         patterns.append(f"{last_name}.{first_name}@{domain}")
     patterns.append(f"{first_name}@{domain}")
-
     return patterns[0] if patterns else ""
 
 def get_leads_from_serpapi(query, num_results=10):
     if not SERPAPI_KEY:
-        st.error("SerpAPI key not found. Please set it in Streamlit secrets or environment variables.")
+        st.error("SerpAPI key not found.")
         st.stop()
-
     url = "https://serpapi.com/search.json"
     params = {
         "q": query,
@@ -136,39 +122,34 @@ def get_leads_from_serpapi(query, num_results=10):
     response = requests.get(url, params=params)
     results = response.json()
     leads = []
-
     for result in results.get("organic_results", []):
         title = result.get("title", "")
         link = result.get("link", "")
         snippet = result.get("snippet", "")
-
         name = extract_name(title)
         role = clean_role(title)
         company = clean_company(title)
-
         email_from_snippet = extract_email_from_text(snippet)
         phone_from_snippet = extract_phone_from_text(snippet)
-
         email_from_page, phone_from_page = "", ""
         if not email_from_snippet and not phone_from_snippet:
-             email_from_page, phone_from_page = fetch_emails_and_phone_from_url(link)
-
+            email_from_page, phone_from_page = fetch_emails_and_phone_from_url(link)
         domain = extract_domain_from_url(link)
         guessed_email = guess_email(name, domain) if name and domain else ""
-
         final_email = email_from_snippet or email_from_page or guessed_email
         phone = phone_from_snippet or phone_from_page
-
         if "linkedin.com" in final_email.lower():
             final_email = ""
-
         leads.append({
             "Name": name,
             "Role": role,
             "Company": company,
             "LinkedIn URL": link,
             "Email": final_email,
-            "Phone": phone
+            "Phone": phone,
+            "Domain": domain,
+            "Guessed Email": guessed_email,
+            "Raw Title": title
         })
     return leads
 
@@ -183,28 +164,20 @@ if st.button("Generate Leads"):
         query = prompt
         if "site:linkedin.com/in/" not in query.lower():
             query += " site:linkedin.com/in/"
-
         leads = get_leads_from_serpapi(query)
         df = pd.DataFrame(leads)
-
-        df = df[df["Name"].astype(bool) & df["Email"].astype(bool)]
-
+        st.write("Raw Extracted Leads:", df)
         if not df.empty:
             df["Verified"] = df["Email"].apply(lambda x: "✅" if x and "@" in x else "")
-
-            st.success(f" {len(df)} leads found.")
-            st.markdown(f" **Companies found:** {df['Company'].nunique()}")
+            st.success(f"{len(df)} leads found.")
+            st.markdown(f"**Companies found:** {df['Company'].nunique()}")
             st.markdown(f"**Unique names:** {df['Name'].nunique()}")
-
-            df_display = df.copy()
-            df_display["LinkedIn"] = df_display["LinkedIn URL"].apply(lambda x: f"[View Profile]({x})")
-            df_display["Summary"] = df_display["Role"].fillna("") + " at " + df_display["Company"].fillna("")
-            df_display = df_display[["Name", "Summary", "Email", "Phone", "LinkedIn", "Verified"]]
-
-            st.markdown("### 🧑‍💼 Leads Table with History & Clickable Profiles")
+            df["LinkedIn"] = df["LinkedIn URL"].apply(lambda x: f"[View Profile]({x})")
+            df["Summary"] = df["Role"].fillna("") + " at " + df["Company"].fillna("")
+            df_display = df[["Name", "Summary", "Email", "Phone", "LinkedIn", "Verified"]]
+            st.markdown("### 🧑‍💼 Leads Table")
             st.markdown(df_display.to_markdown(index=False), unsafe_allow_html=True)
-
             csv = df_display.to_csv(index=False).encode("utf-8")
             st.download_button("📥 Download as CSV", data=csv, file_name="leads.csv", mime="text/csv")
         else:
-            st.warning("No leads found. Try modifying your prompt or filters.")
+            st.warning("No leads found. Try modifying your prompt.")
