@@ -121,10 +121,10 @@ def get_leads_from_serpapi(query, num_results=10):
     return leads
 
 # UI
-st.title("📊 Prompt-Based B2B Lead Generator")
+st.title("Prompt-Based B2B Lead Generator")
 st.markdown("Enter a natural prompt like: *'Get leads for vendor onboarding at MNCs for SURG'*")
 
-prompt = st.text_input("Enter your prompt", value="Give me all the leads for vendor onboarding of SURG to different MNCs")
+prompt = st.text_input("Enter your prompt", value=" ")
 
 if st.button("Generate Leads"):
     with st.spinner("🔍 Searching the web..."):
