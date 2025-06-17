@@ -4,13 +4,13 @@ import pandas as pd
 import re
 import os
 
-
+# --- CONFIG ---
 SERPAPI_KEY = st.secrets.get("SERPAPI_KEY", os.getenv("SERPAPI_KEY", ""))
 
 EMAIL_REGEX = r"[\w\.-]+@[\w\.-]+\.\w+"
 PHONE_REGEX = r"\+?\d[\d\s\-\(\)]{8,}\d"
 
-
+# --- Extraction ---
 def extract_email_from_text(text):
     emails = re.findall(EMAIL_REGEX, text)
     return emails[0] if emails else ""
@@ -21,7 +21,7 @@ def extract_phone_from_text(text):
 
 def fetch_emails_and_phone_from_url(url):
     if "linkedin.com" in url:
-        return ("", "")  
+        return ("", "")  # Skip LinkedIn URLs
     try:
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
@@ -31,7 +31,7 @@ def fetch_emails_and_phone_from_url(url):
         print(f"Error fetching {url}: {e}")
     return ("", "")
 
-
+# --- Lead Extraction from SerpAPI ---
 def get_leads_from_serpapi(query, num_results=10):
     if not SERPAPI_KEY:
         st.error("SerpAPI key not found. Please set it in Streamlit secrets or environment variables.")
@@ -135,7 +135,6 @@ st.markdown("Enter a natural prompt like: _'Get leads for vendor onboarding at M
 
 prompt = st.text_input("Enter your prompt", value="Give me all the leads for vendor onboarding of SURG to different MNCs")
 
-
 if st.button("Generate Leads"):
     with st.spinner("Searching the web..."):
         query = prompt
@@ -146,16 +145,21 @@ if st.button("Generate Leads"):
         df = pd.DataFrame(leads)
 
         if not df.empty:
-            
-
             df["Verified"] = df["Email"].apply(lambda x: "✅" if x and "@" in x else "")
 
             st.success(f" {len(df)} leads found.")
             st.markdown(f" **Companies found:** {df['Company'].nunique()}")
             st.markdown(f"**Unique names:** {df['Name'].nunique()}")
 
-            st.dataframe(df)
-            csv = df.drop(columns=["Verified"]).to_csv(index=False).encode('utf-8')
-            st.download_button(" Download as CSV", data=csv, file_name="leads.csv", mime="text/csv")
+            df_display = df.copy()
+            df_display["LinkedIn"] = df_display["LinkedIn URL"].apply(lambda x: f"[View Profile]({x})")
+            df_display["Summary"] = df_display["Role"].fillna("") + " at " + df_display["Company"].fillna("")
+            df_display = df_display[["Name", "Summary", "Email", "Phone", "LinkedIn"]]
+
+            st.markdown("### 🧑‍💼 Leads Table with History & Clickable Profiles")
+            st.markdown(df_display.to_markdown(index=False), unsafe_allow_html=True)
+
+            csv = df_display.to_csv(index=False).encode("utf-8")
+            st.download_button("📥 Download as CSV", data=csv, file_name="leads.csv", mime="text/csv")
         else:
             st.warning("No leads found. Try modifying your prompt or filters.")
