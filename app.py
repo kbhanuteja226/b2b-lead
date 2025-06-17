@@ -4,13 +4,13 @@ import pandas as pd
 import re
 import os
 
-# --- CONFIG ---
+
 SERPAPI_KEY = st.secrets.get("SERPAPI_KEY", os.getenv("SERPAPI_KEY", ""))
 
 EMAIL_REGEX = r"[\w\.-]+@[\w\.-]+\.\w+"
 PHONE_REGEX = r"\+?\d[\d\s\-\(\)]{8,}\d"
 
-# --- Extraction ---
+
 def extract_email_from_text(text):
     emails = re.findall(EMAIL_REGEX, text)
     return emails[0] if emails else ""
@@ -21,7 +21,7 @@ def extract_phone_from_text(text):
 
 def fetch_emails_and_phone_from_url(url):
     if "linkedin.com" in url:
-        return ("", "")  # Skip LinkedIn URLs
+        return ("", "")  
     try:
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
@@ -31,7 +31,7 @@ def fetch_emails_and_phone_from_url(url):
         print(f"Error fetching {url}: {e}")
     return ("", "")
 
-# --- Lead Extraction from SerpAPI ---
+
 def get_leads_from_serpapi(query, num_results=10):
     if not SERPAPI_KEY:
         st.error("SerpAPI key not found. Please set it in Streamlit secrets or environment variables.")
