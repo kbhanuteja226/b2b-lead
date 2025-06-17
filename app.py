@@ -160,6 +160,8 @@ st.markdown("Enter a natural prompt like: _'Get leads for vendor onboarding at M
 
 prompt = st.text_input("Enter your prompt", value="Give me all the leads for vendor onboarding of SURG to different MNCs")
 
+
+
 if st.button("Generate Leads"):
     with st.spinner("Searching the web..."):
         query = prompt
@@ -167,26 +169,23 @@ if st.button("Generate Leads"):
             query += " site:linkedin.com/in/"
         leads = get_leads_from_serpapi(query)
         df = pd.DataFrame(leads)
-        st.write("Raw Extracted Leads:", df)
-
 
         if not df.empty:
             df["Verified"] = df["Email"].apply(lambda x: "✅" if x and "@" in x else "")
             st.success(f"{len(df)} leads found.")
             st.markdown(f"**Companies found:** {df['Company'].nunique()}")
             st.markdown(f"**Unique names:** {df['Name'].nunique()}")
-            df["LinkedIn"] = df["LinkedIn URL"].apply(lambda x: f"[View Profile]({x})")
-            df["Summary"] = df["Role"].fillna("") + " at " + df["Company"].fillna("")
-            
-            # Display markdown version with clickable links in UI
-            df_display_markdown = df[["Name", "Summary", "Email", "Phone", "LinkedIn", "Verified"]]
-            st.markdown("### 🧑‍💼 Leads Table")
-            st.markdown(df_display_markdown.to_markdown(index=False), unsafe_allow_html=True)
-            
-            # CSV version with raw URL
-            df_csv = df[["Name", "Summary", "Email", "Phone", "LinkedIn URL", "Verified"]]
-            csv = df_csv.to_csv(index=False).encode("utf-8")
-            st.download_button("📥 Download as CSV", data=csv, file_name="leads.csv", mime="text/csv")
 
+            # Make LinkedIn URLs clickable in the table
+            df_display = df[["Name", "Role", "Company", "LinkedIn URL", "Email"]].copy()
+            df_display["LinkedIn URL"] = df_display["LinkedIn URL"].apply(lambda x: f'<a href="{x}" target="_blank">{x}</a>')
+
+            # Show table with clickable links
+            st.markdown("### 📋 Raw Extracted Leads:")
+            st.write(df_display.to_html(escape=False, index=False), unsafe_allow_html=True)
+
+            # Downloadable CSV (with raw URLs)
+            csv = df[["Name", "Role", "Company", "LinkedIn URL", "Email"]].to_csv(index=False).encode("utf-8")
+            st.download_button("📥 Download as CSV", data=csv, file_name="leads.csv", mime="text/csv")
         else:
             st.warning("No leads found. Try modifying your prompt.")
