@@ -6,6 +6,7 @@ import os
 
 # --- CONFIG ---
 SERPAPI_KEY = st.secrets.get("SERPAPI_KEY", os.getenv("SERPAPI_KEY", ""))
+PROXYCURL_API_KEY = st.secrets.get("PROXYCURL_API_KEY", os.getenv("PROXYCURL_API_KEY", ""))
 
 EMAIL_REGEX = r"[\w\.-]+@[\w\.-]+\.\w+"
 PHONE_REGEX = r"\+?\d[\d\s\-\(\)]{8,}\d"
@@ -30,6 +31,31 @@ def fetch_emails_and_phone_from_url(url):
     except Exception as e:
         print(f"Error fetching {url}: {e}")
     return ("", "")
+
+# --- Proxycurl enrichment ---
+def enrich_with_proxycurl(linkedin_url):
+    if not PROXYCURL_API_KEY or "linkedin.com/in/" not in linkedin_url:
+        return {"role": "", "company": ""}
+
+    headers = {
+        "Authorization": f"Bearer {PROXYCURL_API_KEY}"
+    }
+    params = {
+        "url": linkedin_url,
+        "use_cache": "if-present"
+    }
+    try:
+        response = requests.get("https://nubela.co/proxycurl/api/v2/linkedin", headers=headers, params=params)
+        if response.status_code == 200:
+            data = response.json()
+            current_pos = data.get("experiences", [{}])[0] if data.get("experiences") else {}
+            return {
+                "role": current_pos.get("title", ""),
+                "company": current_pos.get("company", "")
+            }
+    except Exception as e:
+        print(f"Proxycurl error: {e}")
+    return {"role": "", "company": ""}
 
 # --- Lead Extraction from SerpAPI ---
 def get_leads_from_serpapi(query, num_results=10):
@@ -66,6 +92,11 @@ def get_leads_from_serpapi(query, num_results=10):
 
         final_email = email_from_snippet or email_from_page or guessed_email
         phone = phone_from_snippet or phone_from_page
+
+        if not role or not company:
+            enriched = enrich_with_proxycurl(link)
+            role = role or enriched["role"]
+            company = company or enriched["company"]
 
         if "linkedin.com" in final_email:
             final_email = ""
