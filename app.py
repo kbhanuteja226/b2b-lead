@@ -139,7 +139,8 @@ if st.button("Generate Leads"):
             st.markdown(f"**Unique names:** {df['Name'].nunique()}")
 
             # Clickable LinkedIn link
-            df["LinkedIn URL"] = df["LinkedIn URL"].apply(lambda x: f'=HYPERLINK("{x}", "View Profile")' if pd.notna(x) else "")
+            df["LinkedIn"] = df["LinkedIn URL"].apply(lambda x: f"[View Profile]({x})" if pd.notna(x) else "")
+
 
             # Display table
             display_df = df[["Name", "Role", "Company", "LinkedIn URL", "Email", "Phone", "Guessed Email", "Raw Title"]]
