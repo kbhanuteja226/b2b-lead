@@ -143,9 +143,25 @@ if st.button("Generate Leads"):
 
 
             # Display table
-            display_df = df[["Name", "Role", "Company", "LinkedIn URL", "Email", "Phone", "Guessed Email", "Raw Title"]]
-            st.markdown("### 🧑‍💼 Leads Table")
-            st.dataframe(display_df, use_container_width=True)
+            st.markdown("### 🧑‍💼 Leads List (Clickable LinkedIn Links)")
+
+            for index, row in df.iterrows():
+                st.markdown(
+                    f"""
+                    <div style="border:1px solid #e6e6e6; padding:15px; border-radius:10px; margin-bottom:10px;">
+                    <strong>Name:</strong> {row['Name']}<br>
+                    <strong>Role:</strong> {row['Role']}<br>
+                    <strong>Company:</strong> {row['Company']}<br>
+                    <strong>LinkedIn:</strong> <a href="{row['LinkedIn URL']}" target="_blank">View Profile</a><br>
+                    <strong>Email:</strong> {row['Email']}<br>
+                    <strong>Phone:</strong> {row['Phone']}<br>
+                    <strong>Guessed Email:</strong> {row['Guessed Email']}<br>
+                    <strong>Raw Title:</strong> {row['Raw Title']}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            
 
             # Excel export
             buffer = io.BytesIO()
