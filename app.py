@@ -4,11 +4,12 @@ import pandas as pd
 import re
 import os
 
+# --- CONFIG ---
 SERPAPI_KEY = st.secrets.get("SERPAPI_KEY", os.getenv("SERPAPI_KEY", ""))
-
 EMAIL_REGEX = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 PHONE_REGEX = r"(?:\+\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}(?:\s*x\d+)?"
 
+# --- HELPERS ---
 def extract_email_from_text(text):
     emails = re.findall(EMAIL_REGEX, text)
     return emails[0] if emails else ""
@@ -20,14 +21,11 @@ def extract_phone_from_text(text):
 def fetch_emails_and_phone_from_url(url):
     if "linkedin.com" in url:
         return ("", "")
-    headers = {
-        'User-Agent': 'Mozilla/5.0'
-    }
+    headers = {'User-Agent': 'Mozilla/5.0'}
     try:
         response = requests.get(url, timeout=5, headers=headers)
         response.raise_for_status()
-        content_type = response.headers.get('Content-Type', '')
-        if 'text/html' not in content_type:
+        if 'text/html' not in response.headers.get('Content-Type', ''):
             return ("", "")
         text = response.text
         return (extract_email_from_text(text), extract_phone_from_text(text))
@@ -147,14 +145,14 @@ def get_leads_from_serpapi(query, num_results=10):
             "LinkedIn URL": link,
             "Email": final_email,
             "Phone": phone,
-            "Domain": domain,
             "Guessed Email": guessed_email,
             "Raw Title": title
         })
     return leads
 
+# --- STREAMLIT UI ---
 st.set_page_config(page_title="B2B Lead Generator", layout="centered")
-st.title("Prompt-Based B2B Lead Generator")
+st.title("📊 Prompt-Based B2B Lead Generator")
 st.markdown("Enter a natural prompt like: _'Get leads for vendor onboarding at MNCs for SURG'_")
 
 prompt = st.text_input("Enter your prompt", value="Give me all the leads for vendor onboarding of SURG to different MNCs")
@@ -166,26 +164,31 @@ if st.button("Generate Leads"):
             query += " site:linkedin.com/in/"
         leads = get_leads_from_serpapi(query)
         df = pd.DataFrame(leads)
-        st.write("Raw Extracted Leads:", df)
-
 
         if not df.empty:
-            df["Verified"] = df["Email"].apply(lambda x: "✅" if x and "@" in x else "")
             st.success(f"{len(df)} leads found.")
             st.markdown(f"**Companies found:** {df['Company'].nunique()}")
             st.markdown(f"**Unique names:** {df['Name'].nunique()}")
-            df["LinkedIn"] = df["LinkedIn URL"].apply(lambda x: f"[View Profile]({x})")
-            df["Summary"] = df["Role"].fillna("") + " at " + df["Company"].fillna("")
-            
-            # Display markdown version with clickable links in UI
-            df_display_markdown = df[["Name", "Summary", "Email", "Phone", "LinkedIn", "Verified"]]
-            st.markdown("### 🧑‍💼 Leads Table")
-            st.markdown(df_display_markdown.to_markdown(index=False), unsafe_allow_html=True)
-            
-            # CSV version with raw URL
-            df_csv = df[["Name", "Summary", "Email", "Phone", "LinkedIn URL", "Verified"]]
-            csv = df_csv.to_csv(index=False).encode("utf-8")
-            st.download_button("📥 Download as CSV", data=csv, file_name="leads.csv", mime="text/csv")
 
+            # Make LinkedIn URL clickable
+            df["LinkedIn URL"] = df["LinkedIn URL"].apply(
+                lambda url: f'<a href="{url}" target="_blank">{url}</a>' if pd.notna(url) else ""
+            )
+
+            df_display = df[[
+                "Name", "Role", "Company", "LinkedIn URL",
+                "Email", "Phone", "Guessed Email", "Raw Title"
+            ]]
+
+            st.markdown("### 🧑‍💼 Leads Table")
+            st.write(df_display.to_html(escape=False, index=False), unsafe_allow_html=True)
+
+            # Download CSV with raw links
+            df_csv = pd.DataFrame(leads)[[
+                "Name", "Role", "Company", "LinkedIn URL",
+                "Email", "Phone", "Guessed Email", "Raw Title"
+            ]]
+            csv = df_csv.to_csv(index=False).encode("utf-8")
+            st.download_button("📥 Download as CSV", data=csv, file_name="b2b_leads.csv", mime="text/csv")
         else:
-            st.warning("No leads found. Try modifying your prompt.") 
+            st.warning("No leads found. Try modifying your prompt.")
