@@ -21,7 +21,7 @@ def fetch_emails_and_phone_from_url(url):
     if "linkedin.com" in url:
         return ("", "")
     headers = {
-        'User-Agent': 'Mozilla/5.0'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
     }
     try:
         response = requests.get(url, timeout=5, headers=headers)
@@ -39,8 +39,9 @@ def extract_name(title):
         return ""
     name_match = re.search(r"([A-Z][a-z]+(?:\s[A-Z][a-z]+){1,2})", title)
     if name_match:
+        common_roles_to_exclude = ["Manager", "Director", "Engineer", "Head", "Consultant", "Specialist"]
         potential_name = name_match.group(1)
-        if not any(role in potential_name for role in ["Manager", "Director", "Engineer", "Head", "Consultant", "Specialist"]):
+        if not any(role in potential_name for role in common_roles_to_exclude):
             return potential_name.strip()
     parts = title.split(" at ")[0].split()
     name_parts = [w for w in parts if w.istitle() and len(w) > 2 and w.lower() not in ["manager", "engineer", "head", "director", "consultant"]]
@@ -110,7 +111,7 @@ def guess_email(name, domain):
 
 def get_leads_from_serpapi(query, num_results=10):
     if not SERPAPI_KEY:
-        st.error("SerpAPI key not found.")
+        st.error("SerpAPI key not found. Please set it in Streamlit secrets or environment variables.")
         st.stop()
     url = "https://serpapi.com/search.json"
     params = {
@@ -133,7 +134,7 @@ def get_leads_from_serpapi(query, num_results=10):
         phone_from_snippet = extract_phone_from_text(snippet)
         email_from_page, phone_from_page = "", ""
         if not email_from_snippet and not phone_from_snippet:
-            email_from_page, phone_from_page = fetch_emails_and_phone_from_url(link)
+             email_from_page, phone_from_page = fetch_emails_and_phone_from_url(link)
         domain = extract_domain_from_url(link)
         guessed_email = guess_email(name, domain) if name and domain else ""
         final_email = email_from_snippet or email_from_page or guessed_email
@@ -146,10 +147,7 @@ def get_leads_from_serpapi(query, num_results=10):
             "Company": company,
             "LinkedIn URL": link,
             "Email": final_email,
-            "Phone": phone,
-            "Domain": domain,
-            "Guessed Email": guessed_email,
-            "Raw Title": title
+            "Phone": phone
         })
     return leads
 
@@ -166,18 +164,18 @@ if st.button("Generate Leads"):
             query += " site:linkedin.com/in/"
         leads = get_leads_from_serpapi(query)
         df = pd.DataFrame(leads)
-        st.write("Raw Extracted Leads:", df)
+        df = df[df["Name"].astype(bool) & df["Email"].astype(bool)]
         if not df.empty:
-            df["Verified"] = df["Email"].apply(lambda x: "✅" if x and "@" in x else "")
+            df["Verified"] = df["Email"].apply(lambda x: "✅" if "@" in x else "")
+            df["Summary"] = df["Role"].fillna("") + " at " + df["Company"].fillna("")
+            df["LinkedIn"] = df["LinkedIn URL"].apply(lambda x: f'<a href="{x}" target="_blank">View Profile</a>')
+            df_display = df[["Name", "Summary", "Email", "Phone", "LinkedIn", "Verified"]]
             st.success(f"{len(df)} leads found.")
             st.markdown(f"**Companies found:** {df['Company'].nunique()}")
             st.markdown(f"**Unique names:** {df['Name'].nunique()}")
-            df["LinkedIn"] = df["LinkedIn URL"].apply(lambda x: f"[View Profile]({x})")
-            df["Summary"] = df["Role"].fillna("") + " at " + df["Company"].fillna("")
-            df_display = df[["Name", "Summary", "Email", "Phone", "LinkedIn", "Verified"]]
-            st.markdown("### 🧑‍💼 Leads Table")
-            st.markdown(df_display.to_markdown(index=False), unsafe_allow_html=True)
+            st.markdown("### 🧑‍💼 Leads Table with Clickable LinkedIn Profiles")
+            st.write(df_display.to_html(escape=False, index=False), unsafe_allow_html=True)
             csv = df_display.to_csv(index=False).encode("utf-8")
             st.download_button("📥 Download as CSV", data=csv, file_name="leads.csv", mime="text/csv")
         else:
-            st.warning("No leads found. Try modifying your prompt.")
+            st.warning("No leads found. Try modifying your prompt or filters.")
