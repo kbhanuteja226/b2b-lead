@@ -1,4 +1,4 @@
 streamlit
-requests
 pandas
-tabulate
+requests
+xlsxwriter
