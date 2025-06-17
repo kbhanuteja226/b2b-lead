@@ -1,5 +1,3 @@
-new code 
-
 
 import streamlit as st
 import requests
@@ -177,10 +175,16 @@ if st.button("Generate Leads"):
             st.markdown(f"**Unique names:** {df['Name'].nunique()}")
             df["LinkedIn"] = df["LinkedIn URL"].apply(lambda x: f"[View Profile]({x})")
             df["Summary"] = df["Role"].fillna("") + " at " + df["Company"].fillna("")
-            df_display = df[["Name", "Summary", "Email", "Phone", "LinkedIn", "Verified"]]
+            
+            # Display markdown version with clickable links in UI
+            df_display_markdown = df[["Name", "Summary", "Email", "Phone", "LinkedIn", "Verified"]]
             st.markdown("### 🧑‍💼 Leads Table")
-            st.markdown(df_display.to_markdown(index=False), unsafe_allow_html=True)
-            csv = df_display.to_csv(index=False).encode("utf-8")
+            st.markdown(df_display_markdown.to_markdown(index=False), unsafe_allow_html=True)
+            
+            # CSV version with raw URL
+            df_csv = df[["Name", "Summary", "Email", "Phone", "LinkedIn URL", "Verified"]]
+            csv = df_csv.to_csv(index=False).encode("utf-8")
             st.download_button("📥 Download as CSV", data=csv, file_name="leads.csv", mime="text/csv")
+
         else:
             st.warning("No leads found. Try modifying your prompt.")
