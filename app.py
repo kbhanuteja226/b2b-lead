@@ -4,12 +4,40 @@ import pandas as pd
 import re
 import os
 
+# --- CSS Styling ---
+st.markdown("""
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #404040;
+            padding: 8px 12px;
+            text-align: center;
+        }
+        th {
+            background-color: #2b2b2b;
+            color: white;
+        }
+        td a {
+            color: #1f77b4;
+            word-wrap: break-word;
+        }
+        td {
+            color: #f1f1f1;
+        }
+        .row-widget.stButton {
+            text-align: center;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- CONFIG ---
 SERPAPI_KEY = st.secrets.get("SERPAPI_KEY", os.getenv("SERPAPI_KEY", ""))
 EMAIL_REGEX = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 PHONE_REGEX = r"(?:\+\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}(?:\s*x\d+)?"
 
-# --- HELPERS ---
 def extract_email_from_text(text):
     emails = re.findall(EMAIL_REGEX, text)
     return emails[0] if emails else ""
@@ -85,26 +113,22 @@ def clean_company(text):
 
 def extract_domain_from_url(url):
     match = re.search(r"https?://(?:www\.)?([^/]+)", url)
-    if match:
-        return match.group(1)
-    return ""
+    return match.group(1) if match else ""
 
 def guess_email(name, domain):
     if not name or not domain:
         return ""
     name_parts = name.lower().split()
-    if not name_parts:
-        return ""
     first_name = name_parts[0]
     last_name = name_parts[-1] if len(name_parts) > 1 else ""
-    patterns = []
-    if first_name and last_name:
-        patterns.append(f"{first_name}.{last_name}@{domain}")
-        patterns.append(f"{first_name[0]}{last_name}@{domain}")
-        patterns.append(f"{first_name}{last_name}@{domain}")
-        patterns.append(f"{last_name}.{first_name}@{domain}")
-    patterns.append(f"{first_name}@{domain}")
-    return patterns[0] if patterns else ""
+    patterns = [
+        f"{first_name}.{last_name}@{domain}",
+        f"{first_name[0]}{last_name}@{domain}",
+        f"{first_name}{last_name}@{domain}",
+        f"{last_name}.{first_name}@{domain}",
+        f"{first_name}@{domain}"
+    ]
+    return patterns[0]
 
 def get_leads_from_serpapi(query, num_results=10):
     if not SERPAPI_KEY:
@@ -150,7 +174,7 @@ def get_leads_from_serpapi(query, num_results=10):
         })
     return leads
 
-# --- STREAMLIT UI ---
+# --- Streamlit UI ---
 st.set_page_config(page_title="B2B Lead Generator", layout="centered")
 st.title("📊 Prompt-Based B2B Lead Generator")
 st.markdown("Enter a natural prompt like: _'Get leads for vendor onboarding at MNCs for SURG'_")
@@ -158,37 +182,24 @@ st.markdown("Enter a natural prompt like: _'Get leads for vendor onboarding at M
 prompt = st.text_input("Enter your prompt", value="Give me all the leads for vendor onboarding of SURG to different MNCs")
 
 if st.button("Generate Leads"):
-    with st.spinner("Searching the web..."):
-        query = prompt
-        if "site:linkedin.com/in/" not in query.lower():
-            query += " site:linkedin.com/in/"
-        leads = get_leads_from_serpapi(query)
+    with st.spinner("🔍 Searching the web..."):
+        if "site:linkedin.com/in/" not in prompt.lower():
+            prompt += " site:linkedin.com/in/"
+        leads = get_leads_from_serpapi(prompt)
         df = pd.DataFrame(leads)
 
         if not df.empty:
+            df["LinkedIn"] = df["LinkedIn URL"].apply(lambda x: f'<a href="{x}" target="_blank">View Profile</a>')
+            df_display = df[["Name", "Role", "Company", "LinkedIn", "Email", "Phone", "Guessed Email", "Raw Title"]]
+
             st.success(f"{len(df)} leads found.")
             st.markdown(f"**Companies found:** {df['Company'].nunique()}")
             st.markdown(f"**Unique names:** {df['Name'].nunique()}")
 
-            # Make LinkedIn URL clickable
-            df["LinkedIn URL"] = df["LinkedIn URL"].apply(
-                lambda url: f'<a href="{url}" target="_blank">{url}</a>' if pd.notna(url) else ""
-            )
-
-            df_display = df[[
-                "Name", "Role", "Company", "LinkedIn URL",
-                "Email", "Phone", "Guessed Email", "Raw Title"
-            ]]
-
             st.markdown("### 🧑‍💼 Leads Table")
-            st.write(df_display.to_html(escape=False, index=False), unsafe_allow_html=True)
+            st.markdown(df_display.to_html(escape=False, index=False), unsafe_allow_html=True)
 
-            # Download CSV with raw links
-            df_csv = pd.DataFrame(leads)[[
-                "Name", "Role", "Company", "LinkedIn URL",
-                "Email", "Phone", "Guessed Email", "Raw Title"
-            ]]
-            csv = df_csv.to_csv(index=False).encode("utf-8")
+            csv = df_display.to_csv(index=False).encode("utf-8")
             st.download_button("📥 Download as CSV", data=csv, file_name="b2b_leads.csv", mime="text/csv")
         else:
             st.warning("No leads found. Try modifying your prompt.")
