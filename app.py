@@ -143,7 +143,7 @@ if st.button("Generate Leads"):
 
 
             # Display table
-            st.markdown("### 🧑‍💼 Leads List (Clickable LinkedIn Links)")
+            st.markdown("###  Leads List (Clickable LinkedIn Links)")
 
             for index, row in df.iterrows():
                 st.markdown(
