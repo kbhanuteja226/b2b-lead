@@ -53,9 +53,7 @@ def get_leads_from_serpapi(query, num_results=10):
         link = result.get("link", "")
         snippet = result.get("snippet", "")
 
-        name = extract_name(title)
-        role = clean_role(title)
-        company = clean_company(title)
+        name, role, company = extract_name_role_company(title)
 
         email_from_snippet = extract_email_from_text(snippet)
         phone_from_snippet = extract_phone_from_text(snippet)
@@ -81,18 +79,24 @@ def get_leads_from_serpapi(query, num_results=10):
     return leads
 
 # --- Helpers ---
-def extract_name(title):
-    if not title: return ""
-    parts = title.split(" at ")[0].split()
-    name_parts = [w for w in parts if w.istitle() and len(w) > 2 and w.lower() not in ["manager", "engineer", "head"]]
-    return " ".join(name_parts[:2]) if name_parts else ""
+def extract_name_role_company(title):
+    if not title:
+        return "", "", ""
+    if " at " in title:
+        name_role, company = title.split(" at ", 1)
+        parts = name_role.split()
+        name = " ".join(parts[:2])
+        role = " ".join(parts[2:]) if len(parts) > 2 else ""
+        return name.strip(), role.strip(), company.strip()
+    return "", "", ""
 
 def clean_role(text):
     if not isinstance(text, str): return ""
     role_keywords = [
         "manager", "executive", "specialist", "recruiter", "head", "lead",
         "officer", "analyst", "director", "coordinator", "consultant", "rcm",
-        "engineer", "developer", "hr", "human resources"
+        "engineer", "developer", "hr", "human resources", "partner", "architect",
+        "founder", "co-founder", "owner", "sales", "marketing", "operations"
     ]
     for word in role_keywords:
         match = re.search(rf"\b\w*{word}\w*\b", text, re.I)
