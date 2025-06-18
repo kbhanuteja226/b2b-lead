@@ -6,10 +6,10 @@ import os
 import io
 from pandas import ExcelWriter
 
-# MUST be the first Streamlit call
+
 st.set_page_config(page_title="B2B Lead Generator", layout="centered")
 
-# --- CONFIG ---
+# CONFIG
 SERPAPI_KEY = st.secrets.get("SERPAPI_KEY", os.getenv("SERPAPI_KEY", ""))
 
 EMAIL_REGEX = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
@@ -134,7 +134,7 @@ if st.button("Generate Leads"):
         df = pd.DataFrame(leads)
 
         if not df.empty:
-            st.success(f"✅ {len(df)} leads found.")
+            st.success(f" {len(df)} leads found.")
             st.markdown(f"**Companies found:** {df['Company'].nunique()}")
             st.markdown(f"**Unique names:** {df['Name'].nunique()}")
 
@@ -163,4 +163,4 @@ if st.button("Generate Leads"):
                 )
             
         else:
-            st.warning("❌ No leads found. Try modifying your prompt.")
+            st.warning(" No leads found. Try modifying your prompt.")
